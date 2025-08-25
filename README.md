@@ -17,18 +17,9 @@ seu/
 │   ├── solvers.py       # Hungarian algorithm and Sinkhorn operation solvers
 │   └── evaluation.py    # Testing metrics (hits@1, hits@10, MRR)
 ├── data/           # Data loading utilities
-│   └── loaders.py       # KG data loading utilities
-├── utils/          # General utilities
-│   └── helpers.py       # Helper functions and logging
-├── config/         # Configuration management
-│   └── settings.py      # Settings and constants
-└── cli/            # Command line interface
-    └── main.py          # CLI for running experiments
+    └── loaders.py       # KG data loading utilities
 
 tests/              # Comprehensive test suite
-├── unit/           # Unit tests for individual modules
-├── integration/    # Integration tests for component interactions  
-└── fixtures/       # Test fixtures and sample data
 ```
 
 ## Installation
