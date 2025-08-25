@@ -1,0 +1,220 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seu"
+version = "0.1.0"
+description = "SEU (Entity Alignment) - Frustratingly Simple but Effective Unsupervised Entity Alignment without Neural Networks"
+authors = [
+    {name = "SEU Development Team"},
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["entity-alignment", "knowledge-graph", "unsupervised", "embedding"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Core dependencies
+dependencies = [
+    "numpy>=1.19.0",
+    "scipy>=1.6.0",
+    "tensorflow>=2.4.1",
+    "numba>=0.53.0",
+    "tqdm>=4.60.0",
+    "requests>=2.25.0",
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.11.0", 
+    "pytest-mock>=3.6.0",
+    "hypothesis>=6.10.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.812",
+    "sphinx>=4.0.0",
+    "click>=8.0.0",
+    "pyyaml>=5.4.0",
+]
+
+# CLI dependencies
+cli = [
+    "click>=8.0.0",
+    "pyyaml>=5.4.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=0.5.0",
+]
+
+# Testing dependencies
+test = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.11.0",
+    "pytest-mock>=3.6.0", 
+    "hypothesis>=6.10.0",
+]
+
+# All development dependencies
+all = [
+    "numpy>=1.19.0",
+    "scipy>=1.6.0",
+    "tensorflow>=2.4.1",
+    "numba>=0.53.0",
+    "tqdm>=4.60.0",
+    "requests>=2.25.0",
+    "pytest>=6.2.0",
+    "pytest-cov>=2.11.0",
+    "pytest-mock>=3.6.0",
+    "hypothesis>=6.10.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.812",
+    "sphinx>=4.0.0",
+    "click>=8.0.0",
+    "pyyaml>=5.4.0",
+    "sphinx-rtd-theme>=0.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/igeek/SEU"
+Repository = "https://github.com/igeek/SEU"
+Documentation = "https://github.com/igeek/SEU#readme"
+Issues = "https://github.com/igeek/SEU/issues"
+
+[project.scripts]
+seu = "seu.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["seu*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+seu = ["py.typed"]
+
+# Black formatting configuration
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+# Flake8 configuration
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tensorflow.*",
+    "numba.*",
+    "scipy.*",
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = [
+    "tests",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests", 
+    "regression: marks tests as regression tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["seu"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+ignore_errors = true
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
