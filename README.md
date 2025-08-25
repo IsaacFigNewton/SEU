@@ -45,21 +45,6 @@ Install with all development dependencies:
 pip install -e ".[dev]"
 ```
 
-## Development Status
-
-**Phase 1: Package Setup and Structure** ✅ **COMPLETED**
-- [x] Complete package directory structure
-- [x] pyproject.toml with all dependencies
-- [x] Comprehensive test structure
-- [x] Pre-commit hooks configuration  
-- [x] Basic module templates
-
-**Next Phases:**
-- Phase 2: Core Module Extraction (embeddings, features, graph, solvers, evaluation)
-- Phase 3: Data and Utilities (data loaders, configuration, helpers)
-- Phase 4: CLI Interface
-- Phase 5: Comprehensive Testing
-
 ## Original Data and Requirements
 
 ### Datasets
@@ -88,9 +73,6 @@ Download the GloVe vectors:
 
 ## Usage
 
-### Current Status
-The package structure is complete but core functionality is still being implemented.
-
 ### Running Tests
 
 ```bash
@@ -111,4 +93,4 @@ pytest tests/integration/
 ```
 
 ### Original Notebook
-The original implementation is still available in `main.ipynb` for reference.
+The original implementation is still available in `notebooks/main.ipynb` for reference.
