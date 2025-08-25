@@ -6,113 +6,35 @@ Tests the entity alignment solvers including Hungarian and Sinkhorn algorithms.
 
 import pytest
 import numpy as np
-import logging
 from unittest.mock import patch, MagicMock
 
-from seu.core.solvers import EntityAlignmentSolver, HungarianSolver, SinkhornSolver
-
-# Set up test logging
-logging.basicConfig(level=logging.INFO)
-
-
-class TestEntityAlignmentSolver:
-    """Test cases for base EntityAlignmentSolver class."""
-    
-    def test_abstract_base_class(self):
-        """Test that base class is abstract."""
-        # Should not be able to instantiate abstract base class
-        with pytest.raises(TypeError):
-            EntityAlignmentSolver()
-    
-    def test_evaluate_hungarian_results(self):
-        """Test evaluation of Hungarian algorithm results."""
-        # Create a concrete solver for testing
-        solver = HungarianSolver()
-        
-        # Test data: small identity-like similarity matrix
-        similarity_matrix = np.array([
-            [1.0, 0.1, 0.1],
-            [0.1, 1.0, 0.1],
-            [0.1, 0.1, 1.0]
-        ])
-        
-        # Dummy test pairs (not used for Hungarian evaluation)
-        test_pairs = np.array([[0, 0], [1, 1], [2, 2]])
-        
-        # Evaluate
-        metrics = solver.evaluate(similarity_matrix, test_pairs)
-        
-        # Should get perfect hits@1 for identity matrix
-        assert 'hits@1' in metrics
-        assert 'total_pairs' in metrics
-        assert metrics['hits@1'] == 100.0  # Perfect alignment
-        assert metrics['total_pairs'] == 3
-    
-    def test_evaluate_sinkhorn_results(self):
-        """Test evaluation of Sinkhorn algorithm results."""
-        # Create a solver
-        solver = SinkhornSolver(temperature=1.0, max_iterations=5)
-        
-        # Test data: small identity-like similarity matrix
-        similarity_matrix = np.array([
-            [1.0, 0.1, 0.1],
-            [0.1, 1.0, 0.1],
-            [0.1, 0.1, 1.0]
-        ])
-        
-        # Dummy test pairs
-        test_pairs = np.array([[0, 0], [1, 1], [2, 2]])
-        
-        # Evaluate
-        metrics = solver.evaluate(similarity_matrix, test_pairs, batch_size=2)
-        
-        # Should have all required metrics
-        assert 'hits@1' in metrics
-        assert 'hits@10' in metrics
-        assert 'mrr' in metrics
-        assert 'total_pairs' in metrics
-        assert metrics['total_pairs'] == 3
-        
-        # Performance should be reasonable for identity-like matrix
-        assert metrics['hits@1'] > 50.0  # Should be good for diagonal matrix
-        assert metrics['hits@10'] >= metrics['hits@1']  # hits@10 >= hits@1
-        assert 0 <= metrics['mrr'] <= 100.0  # MRR should be in valid range
+from seu.core.solvers import hungarian_solve, sinkhorn_solve
 
 
 class TestHungarianSolver:
-    """Test cases for HungarianSolver class."""
+    """Test cases for hungarian_solve function."""
     
-    def test_init(self):
-        """Test HungarianSolver initialization."""
-        solver = HungarianSolver()
-        assert solver is not None
-        assert isinstance(solver, EntityAlignmentSolver)
-    
-    def test_solve_identity_matrix(self):
+    def test_hungarian_solve_identity_matrix(self):
         """Test solving perfect identity similarity matrix."""
-        solver = HungarianSolver()
-        
         # Perfect identity matrix
         similarity_matrix = np.eye(3)
         
         # Solve
-        assignments = solver.solve(similarity_matrix)
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        # Should return list of tuples
-        assert isinstance(assignments, list)
-        assert len(assignments) == 3
-        assert all(isinstance(pair, tuple) for pair in assignments)
-        assert all(len(pair) == 2 for pair in assignments)
+        # Should return numpy arrays
+        assert isinstance(row_indices, np.ndarray)
+        assert isinstance(col_indices, np.ndarray)
+        assert len(row_indices) == 3
+        assert len(col_indices) == 3
         
         # For identity matrix, should get perfect assignment
-        assignments_dict = dict(assignments)
+        assignments = dict(zip(row_indices, col_indices))
         expected_assignments = {0: 0, 1: 1, 2: 2}
-        assert assignments_dict == expected_assignments
+        assert assignments == expected_assignments
     
-    def test_solve_small_matrix(self):
+    def test_hungarian_solve_small_matrix(self):
         """Test solving small similarity matrix."""
-        solver = HungarianSolver()
-        
         # Test matrix where optimal assignment is not identity
         similarity_matrix = np.array([
             [0.1, 0.9, 0.2],
@@ -121,23 +43,22 @@ class TestHungarianSolver:
         ])
         
         # Solve
-        assignments = solver.solve(similarity_matrix)
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        # Should return list of tuples
-        assert isinstance(assignments, list)
-        assert len(assignments) == 3
+        # Should return numpy arrays
+        assert isinstance(row_indices, np.ndarray)
+        assert isinstance(col_indices, np.ndarray)
+        assert len(row_indices) == 3
+        assert len(col_indices) == 3
         
         # Check that it's a valid assignment (each row and column used exactly once)
-        rows, cols = zip(*assignments)
-        assert set(rows) == {0, 1, 2}
-        assert set(cols) == {0, 1, 2}
-        assert len(set(rows)) == 3
-        assert len(set(cols)) == 3
+        assert set(row_indices) == {0, 1, 2}
+        assert set(col_indices) == {0, 1, 2}
+        assert len(set(row_indices)) == 3
+        assert len(set(col_indices)) == 3
     
-    def test_solve_rectangular_matrix(self):
+    def test_hungarian_solve_rectangular_matrix(self):
         """Test solving rectangular similarity matrix."""
-        solver = HungarianSolver()
-        
         # 3x4 matrix
         similarity_matrix = np.array([
             [0.1, 0.9, 0.2, 0.3],
@@ -146,119 +67,98 @@ class TestHungarianSolver:
         ])
         
         # Solve
-        assignments = solver.solve(similarity_matrix)
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        # Should return list of tuples
-        assert isinstance(assignments, list)
-        assert len(assignments) == 3  # min(3, 4)
+        # Should return numpy arrays
+        assert isinstance(row_indices, np.ndarray)
+        assert isinstance(col_indices, np.ndarray)
+        assert len(row_indices) == 3  # min(3, 4)
+        assert len(col_indices) == 3
         
         # Check validity
-        rows, cols = zip(*assignments)
-        assert len(set(rows)) == 3  # All rows should be assigned
-        assert len(set(cols)) == 3  # 3 different columns should be assigned
-        assert max(cols) < 4  # Column indices should be valid
+        assert len(set(row_indices)) == 3  # All rows should be assigned
+        assert len(set(col_indices)) == 3  # 3 different columns should be assigned
+        assert max(col_indices) < 4  # Column indices should be valid
     
-    def test_solve_large_matrix(self):
+    def test_hungarian_solve_large_matrix(self):
         """Test solving large similarity matrix."""
-        solver = HungarianSolver()
-        
         # Generate random 50x50 matrix
         np.random.seed(42)  # For reproducible results
         similarity_matrix = np.random.rand(50, 50)
         
         # Solve
-        assignments = solver.solve(similarity_matrix)
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        # Should return list of tuples
-        assert isinstance(assignments, list)
-        assert len(assignments) == 50
+        # Should return numpy arrays
+        assert isinstance(row_indices, np.ndarray)
+        assert isinstance(col_indices, np.ndarray)
+        assert len(row_indices) == 50
+        assert len(col_indices) == 50
         
         # Check that it's a valid assignment
-        rows, cols = zip(*assignments)
-        assert set(rows) == set(range(50))
-        assert set(cols) == set(range(50))
-        assert len(set(rows)) == 50
-        assert len(set(cols)) == 50
+        assert set(row_indices) == set(range(50))
+        assert set(col_indices) == set(range(50))
+        assert len(set(row_indices)) == 50
+        assert len(set(col_indices)) == 50
     
-    def test_solve_empty_matrix(self):
-        """Test error handling for empty matrix."""
-        solver = HungarianSolver()
-        
-        empty_matrix = np.array([])
-        
-        with pytest.raises(ValueError, match="Similarity matrix cannot be empty"):
-            solver.solve(empty_matrix)
+    def test_hungarian_solve_tensor_input(self):
+        """Test solving with TensorFlow tensor input."""
+        try:
+            import tensorflow as tf
+            similarity_matrix = tf.constant([[1.0, 0.2], [0.3, 0.9]])
+            
+            # Should work with tensor input (converted internally)
+            row_indices, col_indices = hungarian_solve(similarity_matrix)
+            
+            assert isinstance(row_indices, np.ndarray)
+            assert isinstance(col_indices, np.ndarray)
+            assert len(row_indices) == 2
+            assert len(col_indices) == 2
+        except ImportError:
+            pytest.skip("TensorFlow not available")
     
-    def test_solve_1d_matrix(self):
-        """Test error handling for 1D matrix."""
-        solver = HungarianSolver()
+    def test_hungarian_solve_maximization(self):
+        """Test that Hungarian algorithm maximizes similarity."""
+        # Matrix where maximum assignment is clear
+        similarity_matrix = np.array([
+            [1.0, 0.1],
+            [0.1, 1.0]
+        ])
         
-        matrix_1d = np.array([1, 2, 3])
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        with pytest.raises(ValueError, match="Similarity matrix must be 2D"):
-            solver.solve(matrix_1d)
-    
-    def test_solve_3d_matrix(self):
-        """Test error handling for 3D matrix."""
-        solver = HungarianSolver()
-        
-        matrix_3d = np.zeros((2, 2, 2))
-        
-        with pytest.raises(ValueError, match="Similarity matrix must be 2D"):
-            solver.solve(matrix_3d)
+        # Should assign 0->0 and 1->1 for maximum total similarity
+        assignments = dict(zip(row_indices, col_indices))
+        assert assignments[0] == 0
+        assert assignments[1] == 1
     
     @patch('seu.core.solvers.optimize.linear_sum_assignment')
-    def test_solve_scipy_error_handling(self, mock_linear_sum):
-        """Test error handling when scipy fails."""
-        solver = HungarianSolver()
-        
-        # Mock scipy to raise an exception
-        mock_linear_sum.side_effect = RuntimeError("Scipy error")
+    def test_hungarian_solve_scipy_integration(self, mock_linear_sum):
+        """Test integration with scipy.optimize.linear_sum_assignment."""
+        # Mock scipy to return specific values
+        mock_linear_sum.return_value = (np.array([0, 1, 2]), np.array([2, 0, 1]))
         
         similarity_matrix = np.eye(3)
+        row_indices, col_indices = hungarian_solve(similarity_matrix)
         
-        with pytest.raises(RuntimeError, match="Scipy error"):
-            solver.solve(similarity_matrix)
+        # Should call scipy with maximize=True
+        mock_linear_sum.assert_called_once_with(similarity_matrix, maximize=True)
+        
+        # Should return the mocked values
+        np.testing.assert_array_equal(row_indices, [0, 1, 2])
+        np.testing.assert_array_equal(col_indices, [2, 0, 1])
 
 
 class TestSinkhornSolver:
-    """Test cases for SinkhornSolver class."""
+    """Test cases for sinkhorn_solve function."""
     
-    def test_init_default_params(self):
-        """Test SinkhornSolver initialization with default parameters."""
-        solver = SinkhornSolver()
-        assert solver is not None
-        assert isinstance(solver, EntityAlignmentSolver)
-        assert solver.temperature == 50.0  # From notebook
-        assert solver.max_iterations == 10  # From notebook
-        assert solver.tolerance == 1e-6
-    
-    def test_init_custom_params(self):
-        """Test SinkhornSolver initialization with custom parameters."""
-        solver = SinkhornSolver(temperature=25.0, max_iterations=5, tolerance=1e-4)
-        assert solver.temperature == 25.0
-        assert solver.max_iterations == 5
-        assert solver.tolerance == 1e-4
-    
-    def test_init_backend_selection(self):
-        """Test backend selection logic."""
-        # Test explicit TensorFlow selection
-        solver_tf = SinkhornSolver(use_tensorflow=True)
-        # Should use TF if available, otherwise fallback to NumPy
-        
-        # Test explicit NumPy selection
-        solver_np = SinkhornSolver(use_tensorflow=False)
-        assert solver_np.use_tensorflow == False
-    
-    def test_solve_identity_matrix(self):
+    def test_sinkhorn_solve_identity_matrix(self):
         """Test solving perfect identity similarity matrix."""
-        solver = SinkhornSolver(temperature=1.0, max_iterations=5)  # Lower temp for test
-        
         # Perfect identity matrix
         similarity_matrix = np.eye(3)
         
-        # Solve
-        result_matrix = solver.solve(similarity_matrix)
+        # Solve with moderate temperature for testing
+        result_matrix = sinkhorn_solve(similarity_matrix, temperature=10.0, max_iterations=10)
         
         # Should return numpy array
         assert isinstance(result_matrix, np.ndarray)
@@ -267,25 +167,21 @@ class TestSinkhornSolver:
         # Result should be doubly stochastic (rows and columns sum to ~1)
         row_sums = np.sum(result_matrix, axis=1)
         col_sums = np.sum(result_matrix, axis=0)
-        np.testing.assert_allclose(row_sums, 1.0, atol=2e-2)
-        np.testing.assert_allclose(col_sums, 1.0, atol=2e-2)
+        np.testing.assert_allclose(row_sums, 1.0, atol=1e-2)
+        np.testing.assert_allclose(col_sums, 1.0, atol=1e-2)
         
         # All elements should be non-negative
         assert np.all(result_matrix >= 0)
     
-    def test_solve_small_matrix(self):
+    def test_sinkhorn_solve_small_matrix(self):
         """Test solving small similarity matrix."""
-        solver = SinkhornSolver(temperature=10.0, max_iterations=10)
-        
-        # Test matrix
         similarity_matrix = np.array([
             [0.8, 0.1, 0.1],
             [0.1, 0.8, 0.1],
             [0.1, 0.1, 0.8]
         ])
         
-        # Solve
-        result_matrix = solver.solve(similarity_matrix)
+        result_matrix = sinkhorn_solve(similarity_matrix, temperature=10.0, max_iterations=10)
         
         # Should return numpy array
         assert isinstance(result_matrix, np.ndarray)
@@ -294,32 +190,13 @@ class TestSinkhornSolver:
         # Result should be doubly stochastic
         row_sums = np.sum(result_matrix, axis=1)
         col_sums = np.sum(result_matrix, axis=0)
-        np.testing.assert_allclose(row_sums, 1.0, atol=2e-2)
-        np.testing.assert_allclose(col_sums, 1.0, atol=2e-2)
+        np.testing.assert_allclose(row_sums, 1.0, atol=1e-2)
+        np.testing.assert_allclose(col_sums, 1.0, atol=1e-2)
         
         # All elements should be non-negative
         assert np.all(result_matrix >= 0)
     
-    def test_solve_convergence(self):
-        """Test Sinkhorn algorithm convergence."""
-        # Test with high tolerance to check early stopping
-        solver = SinkhornSolver(temperature=1.0, max_iterations=100, tolerance=1e-3)
-        
-        similarity_matrix = np.array([
-            [1.0, 0.0],
-            [0.0, 1.0]
-        ])
-        
-        # Should converge quickly for this simple matrix
-        result_matrix = solver.solve(similarity_matrix)
-        
-        # Result should be doubly stochastic
-        row_sums = np.sum(result_matrix, axis=1)
-        col_sums = np.sum(result_matrix, axis=0)
-        np.testing.assert_allclose(row_sums, 1.0, atol=2e-2)
-        np.testing.assert_allclose(col_sums, 1.0, atol=2e-2)
-    
-    def test_temperature_parameter_effects(self):
+    def test_sinkhorn_solve_temperature_effects(self):
         """Test temperature parameter effects on solution."""
         similarity_matrix = np.array([
             [0.9, 0.1],
@@ -327,129 +204,126 @@ class TestSinkhornSolver:
         ])
         
         # Low temperature should make solution more deterministic
-        solver_low_temp = SinkhornSolver(temperature=1.0, max_iterations=10)
-        result_low = solver_low_temp.solve(similarity_matrix)
+        result_low = sinkhorn_solve(similarity_matrix, temperature=1.0, max_iterations=10)
         
-        # High temperature should make solution more uniform (use moderate temperature)
-        solver_high_temp = SinkhornSolver(temperature=10.0, max_iterations=10)
-        result_high = solver_high_temp.solve(similarity_matrix)
+        # High temperature should make solution more uniform
+        result_high = sinkhorn_solve(similarity_matrix, temperature=50.0, max_iterations=10)
         
         # Both should be doubly stochastic
         for result in [result_low, result_high]:
             row_sums = np.sum(result, axis=1)
             col_sums = np.sum(result, axis=0)
-            np.testing.assert_allclose(row_sums, 1.0, atol=1e-2)
-            np.testing.assert_allclose(col_sums, 1.0, atol=1e-2)
+            np.testing.assert_allclose(row_sums, 1.0, atol=5e-2)
+            np.testing.assert_allclose(col_sums, 1.0, atol=5e-2)
         
-        # Low temperature should have more extreme values (closer to 0 or 1)
-        # This assertion might not always hold due to numerical precision, so we'll check structure instead
-        # At least one of the results should have reasonable values
+        # Results should be different
+        assert not np.allclose(result_low, result_high, atol=1e-2)
+        
+        # Both should have valid values
         assert np.all(result_low >= 0) and np.all(result_low <= 1)
         assert np.all(result_high >= 0) and np.all(result_high <= 1)
     
-    def test_max_iterations_parameter(self):
+    def test_sinkhorn_solve_max_iterations(self):
         """Test max_iterations parameter."""
         similarity_matrix = np.eye(3)
         
         # Test with different iteration counts
-        solver_few = SinkhornSolver(temperature=10.0, max_iterations=1)
-        result_few = solver_few.solve(similarity_matrix)
-        
-        solver_many = SinkhornSolver(temperature=10.0, max_iterations=20)
-        result_many = solver_many.solve(similarity_matrix)
+        result_few = sinkhorn_solve(similarity_matrix, temperature=10.0, max_iterations=1)
+        result_many = sinkhorn_solve(similarity_matrix, temperature=10.0, max_iterations=20)
         
         # Both should be valid doubly stochastic matrices
         for result in [result_few, result_many]:
             assert isinstance(result, np.ndarray)
             assert result.shape == (3, 3)
             assert np.all(result >= 0)
-    
-    def test_solve_batch(self):
-        """Test batch processing functionality."""
-        solver = SinkhornSolver(temperature=10.0, max_iterations=5)
-        
-        # Create multiple similarity matrices
-        matrices = [
-            np.eye(2),
-            np.array([[0.8, 0.2], [0.3, 0.7]]),
-            np.array([[0.5, 0.5], [0.5, 0.5]])
-        ]
-        
-        # Process in batch
-        results = solver.solve_batch(matrices, batch_size=2)
-        
-        # Should get back same number of results
-        assert len(results) == 3
-        
-        # Each result should be a valid doubly stochastic matrix
-        for result in results:
-            assert isinstance(result, np.ndarray)
-            assert result.shape == (2, 2)
+            
+            # Check doubly stochastic property (more lenient for few iterations)
             row_sums = np.sum(result, axis=1)
             col_sums = np.sum(result, axis=0)
-            np.testing.assert_allclose(row_sums, 1.0, atol=2e-2)
-            np.testing.assert_allclose(col_sums, 1.0, atol=2e-2)
+            np.testing.assert_allclose(row_sums, 1.0, atol=5e-2)
+            np.testing.assert_allclose(col_sums, 1.0, atol=5e-2)
     
-    def test_solve_empty_matrix(self):
-        """Test error handling for empty matrix."""
-        solver = SinkhornSolver()
-        
-        empty_matrix = np.array([])
-        
-        with pytest.raises(ValueError, match="Similarity matrix cannot be empty"):
-            solver.solve(empty_matrix)
+    def test_sinkhorn_solve_tensorflow_backend(self):
+        """Test TensorFlow backend when available."""
+        try:
+            import tensorflow as tf
+            similarity_matrix = np.array([[0.9, 0.1], [0.2, 0.8]])
+            
+            # Should work with TensorFlow backend
+            result = sinkhorn_solve(similarity_matrix, temperature=5.0, max_iterations=10)
+            
+            assert isinstance(result, np.ndarray)
+            assert result.shape == (2, 2)
+            
+            # Result should be doubly stochastic
+            row_sums = np.sum(result, axis=1)
+            col_sums = np.sum(result, axis=0)
+            np.testing.assert_allclose(row_sums, 1.0, atol=5e-2)
+            np.testing.assert_allclose(col_sums, 1.0, atol=5e-2)
+        except ImportError:
+            pytest.skip("TensorFlow not available")
     
-    def test_solve_1d_matrix(self):
-        """Test error handling for 1D matrix."""
-        solver = SinkhornSolver()
+    def test_sinkhorn_solve_numpy_fallback(self):
+        """Test NumPy fallback when TensorFlow is not available."""
+        similarity_matrix = np.array([[0.9, 0.1], [0.2, 0.8]])
         
-        matrix_1d = np.array([1, 2, 3])
+        # Force NumPy backend by mocking HAS_TF
+        with patch('seu.core.solvers.HAS_TF', False):
+            result = sinkhorn_solve(similarity_matrix, temperature=5.0, max_iterations=10)
         
-        with pytest.raises(ValueError, match="Similarity matrix must be 2D"):
-            solver.solve(matrix_1d)
-    
-    def test_solve_3d_matrix(self):
-        """Test error handling for 3D matrix."""
-        solver = SinkhornSolver()
-        
-        matrix_3d = np.zeros((2, 2, 2))
-        
-        with pytest.raises(ValueError, match="Similarity matrix must be 2D"):
-            solver.solve(matrix_3d)
-    
-    def test_numpy_backend(self):
-        """Test NumPy backend specifically."""
-        solver = SinkhornSolver(temperature=5.0, max_iterations=5, use_tensorflow=False)
-        
-        similarity_matrix = np.array([
-            [0.9, 0.1],
-            [0.2, 0.8]
-        ])
-        
-        result = solver.solve(similarity_matrix)
-        
-        # Should return numpy array
         assert isinstance(result, np.ndarray)
         assert result.shape == (2, 2)
         
         # Result should be doubly stochastic
         row_sums = np.sum(result, axis=1)
         col_sums = np.sum(result, axis=0)
-        np.testing.assert_allclose(row_sums, 1.0, atol=2e-2)
-        np.testing.assert_allclose(col_sums, 1.0, atol=2e-2)
+        np.testing.assert_allclose(row_sums, 1.0, atol=1e-2)
+        np.testing.assert_allclose(col_sums, 1.0, atol=1e-2)
     
-    def test_numerical_stability(self):
-        """Test numerical stability with moderately challenging values."""
-        solver = SinkhornSolver(temperature=0.5, max_iterations=15)  # Lower temp, more iterations
+    def test_sinkhorn_solve_tensor_input(self):
+        """Test with TensorFlow tensor input."""
+        try:
+            import tensorflow as tf
+            similarity_matrix = tf.constant([[0.8, 0.2], [0.3, 0.7]], dtype=tf.float32)
+            
+            result = sinkhorn_solve(similarity_matrix, temperature=5.0, max_iterations=5)
+            
+            # Should return numpy array
+            assert isinstance(result, np.ndarray)
+            assert result.shape == (2, 2)
+            
+            # Result should be doubly stochastic
+            row_sums = np.sum(result, axis=1)
+            col_sums = np.sum(result, axis=0)
+            np.testing.assert_allclose(row_sums, 1.0, atol=5e-2)
+            np.testing.assert_allclose(col_sums, 1.0, atol=5e-2)
+        except ImportError:
+            pytest.skip("TensorFlow not available")
+    
+    def test_sinkhorn_solve_convergence(self):
+        """Test algorithm convergence properties."""
+        similarity_matrix = np.array([[1.0, 0.0], [0.0, 1.0]])
         
-        # Matrix with moderately large and small values
-        similarity_matrix = np.array([
-            [10.0, 0.1],
-            [0.1, 10.0]
-        ])
+        # With perfect diagonal matrix, should converge to identity-like result
+        result = sinkhorn_solve(similarity_matrix, temperature=1.0, max_iterations=50)
         
-        # Should not crash and should produce valid result
-        result = solver.solve(similarity_matrix)
+        # Should be doubly stochastic
+        row_sums = np.sum(result, axis=1)
+        col_sums = np.sum(result, axis=0)
+        np.testing.assert_allclose(row_sums, 1.0, atol=1e-3)
+        np.testing.assert_allclose(col_sums, 1.0, atol=1e-3)
+        
+        # For identity matrix with low temperature, diagonal should dominate
+        diagonal = np.diag(result)
+        off_diagonal = result - np.diag(diagonal)
+        assert np.mean(diagonal) > np.mean(np.abs(off_diagonal))
+    
+    def test_sinkhorn_solve_numerical_stability(self):
+        """Test numerical stability with challenging values."""
+        # Matrix with large and small values
+        similarity_matrix = np.array([[10.0, 0.1], [0.1, 10.0]])
+        
+        result = sinkhorn_solve(similarity_matrix, temperature=0.5, max_iterations=20)
         
         assert isinstance(result, np.ndarray)
         assert not np.any(np.isnan(result))
@@ -459,67 +333,48 @@ class TestSinkhornSolver:
         # Should still be approximately doubly stochastic
         row_sums = np.sum(result, axis=1)
         col_sums = np.sum(result, axis=0)
-        # More lenient tolerance due to challenging values
+        np.testing.assert_allclose(row_sums, 1.0, atol=1e-2)
+        np.testing.assert_allclose(col_sums, 1.0, atol=1e-2)
+    
+    def test_sinkhorn_solve_edge_cases(self):
+        """Test edge cases like single element matrix."""
+        # Single element matrix
+        single_matrix = np.array([[0.5]])
+        result_single = sinkhorn_solve(single_matrix, temperature=1.0, max_iterations=5)
+        
+        assert result_single.shape == (1, 1)
+        assert abs(result_single[0, 0] - 1.0) < 1e-6  # Should be exactly 1
+        
+        # 2x2 matrix with zeros
+        zero_matrix = np.array([[0.0, 0.0], [0.0, 0.0]])
+        result_zero = sinkhorn_solve(zero_matrix, temperature=1.0, max_iterations=5)
+        
+        assert result_zero.shape == (2, 2)
+        # After exponentiation, should become uniform
+        expected = np.array([[0.5, 0.5], [0.5, 0.5]])
+        np.testing.assert_allclose(result_zero, expected, atol=1e-2)
+    
+    def test_sinkhorn_solve_consistency(self):
+        """Test that results are consistent for same inputs."""
+        similarity_matrix = np.array([[0.7, 0.3], [0.4, 0.6]])
+        
+        result1 = sinkhorn_solve(similarity_matrix, temperature=5.0, max_iterations=10)
+        result2 = sinkhorn_solve(similarity_matrix, temperature=5.0, max_iterations=10)
+        
+        # Should produce identical results
+        np.testing.assert_allclose(result1, result2, rtol=1e-10)
+    
+    def test_sinkhorn_solve_notebook_compatibility(self):
+        """Test compatibility with notebook parameters."""
+        # Use exact parameters from main.ipynb
+        similarity_matrix = np.random.rand(5, 5)
+        np.random.seed(42)
+        
+        result = sinkhorn_solve(similarity_matrix, temperature=50.0, max_iterations=10)
+        
+        # Should work with notebook parameters
+        assert result.shape == (5, 5)
+        row_sums = np.sum(result, axis=1)
+        col_sums = np.sum(result, axis=0)
         np.testing.assert_allclose(row_sums, 1.0, atol=5e-2)
         np.testing.assert_allclose(col_sums, 1.0, atol=5e-2)
-
-
-class TestSolverComparison:
-    """Test cases comparing solver outputs for consistency."""
-    
-    def test_solver_consistency(self):
-        """Test that both solvers produce reasonable results for same input."""
-        similarity_matrix = np.array([
-            [1.0, 0.1, 0.1],
-            [0.1, 1.0, 0.1],
-            [0.1, 0.1, 1.0]
-        ])
-        
-        # Hungarian solver
-        hungarian_solver = HungarianSolver()
-        hungarian_result = hungarian_solver.solve(similarity_matrix)
-        
-        # Sinkhorn solver
-        sinkhorn_solver = SinkhornSolver(temperature=50.0, max_iterations=10)
-        sinkhorn_result = sinkhorn_solver.solve(similarity_matrix)
-        
-        # Hungarian should give perfect assignment for identity-like matrix
-        hungarian_dict = dict(hungarian_result)
-        expected = {0: 0, 1: 1, 2: 2}
-        assert hungarian_dict == expected
-        
-        # Sinkhorn should give doubly stochastic matrix with high diagonal values
-        assert isinstance(sinkhorn_result, np.ndarray)
-        assert sinkhorn_result.shape == (3, 3)
-        
-        # For identity-like input, diagonal should be dominant
-        diagonal = np.diag(sinkhorn_result)
-        off_diagonal = sinkhorn_result - np.diag(diagonal)
-        assert np.mean(diagonal) > np.mean(np.abs(off_diagonal))
-    
-    def test_solver_performance_comparison(self):
-        """Test performance characteristics of both solvers."""
-        # Create a larger test matrix
-        np.random.seed(42)
-        size = 20
-        similarity_matrix = np.random.rand(size, size)
-        
-        # Add some structure (make diagonal elements larger)
-        similarity_matrix += np.eye(size) * 2
-        
-        # Hungarian solver
-        hungarian_solver = HungarianSolver()
-        hungarian_result = hungarian_solver.solve(similarity_matrix)
-        
-        # Sinkhorn solver
-        sinkhorn_solver = SinkhornSolver(temperature=10.0, max_iterations=10)
-        sinkhorn_result = sinkhorn_solver.solve(similarity_matrix)
-        
-        # Hungarian should return exact number of assignments
-        assert len(hungarian_result) == size
-        
-        # Sinkhorn should return properly sized matrix
-        assert sinkhorn_result.shape == (size, size)
-        
-        # Both should handle the structured matrix reasonably well
-        # (More detailed performance analysis could be added here)

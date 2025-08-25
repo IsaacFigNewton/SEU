@@ -30,13 +30,17 @@ def load_triples(file_path: str, reverse: bool = True) -> Tuple[np.ndarray, int,
                 reversed_triples[i, 1] = triples[i, 1]
         return reversed_triples
     
-    with open(file_path + "triples_1") as f:
+    with open(file_path + "/triples_1") as f:
         triples1 = f.readlines()
         
-    with open(file_path + "triples_2") as f:
+    with open(file_path + "/triples_2") as f:
         triples2 = f.readlines()
         
-    triples = np.array([line.replace("\n", "").split("\t") for line in triples1 + triples2]).astype(np.int64)
+    triples = np.array([line.replace("\n", "").split("\t") for line in triples1 + triples2 if line.strip()]).astype(np.int64)
+    
+    if len(triples) == 0:
+        return np.array([]), 0, 0
+        
     node_size = max([np.max(triples[:, 0]), np.max(triples[:, 2])]) + 1
     rel_size = np.max(triples[:, 1]) + 1
     
@@ -53,12 +57,12 @@ def load_aligned_pair(file_path: str, ratio: float = 0.3) -> Tuple[np.ndarray, n
     Extracted from utils.py.
     """
     if "sup_ent_ids" not in os.listdir(file_path):
-        with open(file_path + "ref_ent_ids") as f:
+        with open(file_path + "/ref_ent_ids") as f:
             aligned = f.readlines()
     else:
-        with open(file_path + "ref_ent_ids") as f:
+        with open(file_path + "/ref_ent_ids") as f:
             ref = f.readlines()
-        with open(file_path + "sup_ent_ids") as f:
+        with open(file_path + "/sup_ent_ids") as f:
             sup = f.readlines()
         aligned = ref + sup
         
